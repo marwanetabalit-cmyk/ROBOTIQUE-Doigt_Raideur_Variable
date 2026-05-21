@@ -1,21 +1,12 @@
 #include <Arduino.h>
+#include <Dynamixel2Arduino.h>
 
 #include "config.h"
-
-#if MOTOR_BACKEND_DYNAMIXEL
-#include <Dynamixel2Arduino.h>
 
 #define DXL_SERIAL Serial2
 
 Dynamixel2Arduino dxl(DXL_SERIAL, DXL_DIR_PIN);
 using namespace ControlTableItem;
-#endif
-
-#if MOTOR_BACKEND_SERVO
-#include <Servo.h>
-
-Servo tendonServo;
-#endif
 
 int32_t position_ouverte = POSITION_OUVERTE;
 int32_t position_fermee = POSITION_FERMEE;
@@ -24,10 +15,8 @@ uint16_t couple_max = COUPLE_MAX;
 uint32_t temps_pause = TEMPS_PAUSE_MS;
 TestMode mode_test = MODE_TEST_DEFAUT;
 
-#if MOTOR_BACKEND_DYNAMIXEL
 uint8_t ID_moteur = ID_MOTEUR;
 uint32_t baudrate = DXL_BAUDRATE;
-#endif
 
 int32_t position_goal = POSITION_OUVERTE;
 int32_t position_present = POSITION_OUVERTE;
@@ -54,7 +43,7 @@ void setup() {
   delay(300);
 
   Serial.println();
-  Serial.println(F("Prototype doigt tendon-driven - test moteur"));
+  Serial.println(F("Prototype doigt tendon-driven - test Dynamixel"));
 
   initMotor();
   printHelp();
@@ -77,7 +66,6 @@ void loop() {
 }
 
 void initMotor() {
-#if MOTOR_BACKEND_DYNAMIXEL
   dxl.begin(baudrate);
   dxl.setPortProtocolVersion(DXL_PROTOCOL_VERSION);
 
@@ -97,34 +85,15 @@ void initMotor() {
   if (DXL_APPLIQUER_LIMITE_COURANT) {
     Serial.println(F("Note: limite de courant a configurer selon le modele Dynamixel."));
   }
-#endif
-
-#if MOTOR_BACKEND_SERVO
-  tendonServo.attach(SERVO_PIN);
-  setTorque(true);
-  motor_ready = true;
-  Serial.println(F("Servo initialise."));
-#endif
 }
 
 void setTorque(bool enabled) {
-#if MOTOR_BACKEND_DYNAMIXEL
   if (enabled) {
     torque_enable = dxl.torqueOn(ID_moteur);
   } else {
     dxl.torqueOff(ID_moteur);
     torque_enable = false;
   }
-#endif
-
-#if MOTOR_BACKEND_SERVO
-  torque_enable = enabled;
-  if (!enabled) {
-    tendonServo.detach();
-  } else if (!tendonServo.attached()) {
-    tendonServo.attach(SERVO_PIN);
-  }
-#endif
 }
 
 void moveToPosition(int32_t target) {
@@ -142,29 +111,11 @@ void moveToPosition(int32_t target) {
 
   position_goal = target;
 
-#if MOTOR_BACKEND_DYNAMIXEL
   if (!torque_enable) {
     setTorque(true);
   }
 
   dxl.setGoalPosition(ID_moteur, position_goal);
-#endif
-
-#if MOTOR_BACKEND_SERVO
-  if (!tendonServo.attached()) {
-    tendonServo.attach(SERVO_PIN);
-  }
-
-  int32_t current = position_present;
-  int32_t step = (position_goal >= current) ? 1 : -1;
-
-  while (current != position_goal) {
-    current += step;
-    tendonServo.write(constrain(current, 0, 180));
-    position_present = current;
-    delay(vitesse_moteur);
-  }
-#endif
 }
 
 int32_t readMotorPosition() {
@@ -172,15 +123,7 @@ int32_t readMotorPosition() {
     return position_present;
   }
 
-#if MOTOR_BACKEND_DYNAMIXEL
   position_present = dxl.getPresentPosition(ID_moteur);
-#endif
-
-#if MOTOR_BACKEND_SERVO
-  // Un servo RC standard ne renvoie pas sa position.
-  position_present = position_goal;
-#endif
-
   return position_present;
 }
 
